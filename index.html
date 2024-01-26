@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Battle 4P</title>
+    <style>
+        #game-board {
+            display: grid;
+            grid-template-rows: repeat(80, 10px);
+            grid-template-columns: repeat(80, 10px);
+            gap: 1px;
+            width: 880px; /* repeat rate * (grid px + gap px) */
+            height: 880px;
+            border: 1px solid black;
+            box-shadow: inset 0 0 0 0px red, inset 0 0 0 0px pink; 
+            margin: 0 auto; /* Add this line to center the element */
+        }
+        
+        #score-card {
+            text-align: center;
+            font-size: 24px;
+            margin-top: 20px;
+        }
+
+        #hp1 {
+            color: blue;
+        }
+
+        #hp2 {
+            color: green;
+        }
+
+        #hp3 {
+            color: grey;
+        }
+
+        #hp4 {
+            color: orange;
+        }
+
+    </style>
+            
+</head>
+<body>
+    <div id="score-card">Snake 1 HP: <span id="hp1">4</span> | Snake 2 HP: <span id="hp2">4</span> | Snake 3 HP: <span id="hp3">4</span> | Snake 4 HP: <span id="hp4">4</span></div>
+    <div id="score-card">Round count down: <span id="count-down">999</span></div>
+    <div class="center" id="game-board"></div>
+    <div id="score-card">Game Timer: <span id="timer">0</span></div>
+    <p id="instructions"></p>
+
+    <script>
+        /** To do:
+         * 4 player, only 2 key contols, turn clockwise or anti-clockwise
+         * Game ends only when final snake dies
+         * Joint positions are allowed
+         **/
+
+        const FRAME_RATE = 5;
+        const BOARD_SIZE = 80; // grid repeat times
+        const PIXEL_SIZE = 11; // 10px + 1px border, repeat px + gap px
+        const MIN_HP = 3;
+        const FRAMES_PER_ROUND = 120;
+        const FOOD_PER_ROUND = 11;
+        const DECREASE_PER_ROUND = Math.floor(BOARD_SIZE/20);
+
+        // Get the game board element
+        const gameBoard = document.getElementById("game-board");
+
+        // Game timer
+        let gameTimer = 0;
+
+        // Set up the game board dimensions
+        let boardWidthMin = 1;
+        let boardWidthMax = BOARD_SIZE;
+        let boardHeightMin = 1;
+        let boardHeightMax = BOARD_SIZE;
+
+        // Create game instructions
+        const instructions = document.getElementById("instructions");
+        instructions.textContent = `Player 1: QW to move. Player 2: ZX to move. Player 3: OP to move. Player 4: ,. to move. 
+        Can turn clockwise or anti-clockwise.
+        Press R to reload. Beware of the shrinking boarder every ${FRAMES_PER_ROUND / FRAME_RATE} seconds!
+        If you drop below ${MIN_HP} HP, you die!`;
+
+        // Create the snakes
+        var snake1 = {
+            body: [
+                { x: (BOARD_SIZE /4), y: (BOARD_SIZE / 4) },
+                { x: (BOARD_SIZE /4 - 1), y: (BOARD_SIZE / 4) },
+                { x: (BOARD_SIZE /4 - 2), y: (BOARD_SIZE / 4) },
+                { x: (BOARD_SIZE /4 - 3), y: (BOARD_SIZE / 4) },
+            ],
+            
+            direction: "right",
+            maxLength: 4,
+            alive: true,
+            player: 1,
+            finishPosition: 0,
+        };
+
+        var snake2 = {
+            body: [
+                { x: (BOARD_SIZE * 3/4), y: BOARD_SIZE / 4},
+                { x: (BOARD_SIZE * 3/4), y: BOARD_SIZE / 4 - 1},
+                { x: (BOARD_SIZE * 3/4), y: BOARD_SIZE / 4 - 2},
+                { x: (BOARD_SIZE * 3/4), y: BOARD_SIZE / 4 - 3},
+            ],
+            direction: "down",
+            maxLength: 4,
+            alive: true,
+            player: 2,
+            finishPosition: 0,
+        };
+
+        var snake3 = {
+            body: [
+                { x: (BOARD_SIZE * 3/4), y: (BOARD_SIZE * 3/4) },
+                { x: (BOARD_SIZE * 3/4 + 1), y: (BOARD_SIZE * 3/4) },
+                { x: (BOARD_SIZE * 3/4 + 2), y: (BOARD_SIZE * 3/4) },
+                { x: (BOARD_SIZE * 3/4 + 3), y: (BOARD_SIZE * 3/4) },
+            ],
+            direction: "left",
+            maxLength: 4,
+            alive: true,
+            player: 3,
+            finishPosition: 0,
+        };
+
+        var snake4 = {
+            body: [
+                { x: (BOARD_SIZE /4), y: BOARD_SIZE * 3/4 },
+                { x: (BOARD_SIZE /4), y: BOARD_SIZE * 3/4 + 1},
+                { x: (BOARD_SIZE /4), y: BOARD_SIZE * 3/4 + 2},
+                { x: (BOARD_SIZE /4), y: BOARD_SIZE * 3/4 + 3},
+            ],
+            direction: "up",
+            maxLength: 4,
+            alive: true,
+            player: 4,
+            finishPosition: 0,
+        };
+
+
+        // Function to game over
+        function gameOver(otherText = ""){
+
+            // use snake finish position to determine winner
+            alert("Game Over!\n  Snake 1 finish position: " + snake1.finishPosition + " with max length: " + snake1.maxLength +
+            "\n  Snake 2 finish position: " + snake2.finishPosition + " with max length: " + snake2.maxLength +
+            "\n  Snake 3 finish position: " + snake3.finishPosition + " with max length: " + snake3.maxLength +
+            "\n  Snake 4 finish position: " + snake4.finishPosition + " with max length: " + snake4.maxLength + "\n" + otherText);
+
+            // alert("Game Over!" + otherText);
+
+            // reload the page if press OK
+            window.location.reload(true);
+            window.location.href = window.location.href;            
+        }
+
+        // Function to draw the snake on the game board
+        function drawSnake() {
+            gameBoard.innerHTML = ""; // Clear the game board
+
+            snake1.body.forEach((segment) => {
+                const snakeSegment = document.createElement("div");
+                snakeSegment.style.gridRowStart = segment.y;
+                snakeSegment.style.gridColumnStart = segment.x;
+                snakeSegment.style.backgroundColor = 'blue';
+                snakeSegment.classList.add("snake");
+                gameBoard.appendChild(snakeSegment);
+            });
+            snake2.body.forEach((segment) => {
+                const snakeSegment = document.createElement("div");
+                snakeSegment.style.gridRowStart = segment.y;
+                snakeSegment.style.gridColumnStart = segment.x;
+                snakeSegment.style.backgroundColor = 'green';
+                snakeSegment.classList.add("snake");
+                gameBoard.appendChild(snakeSegment);
+            });
+            snake3.body.forEach((segment) => {
+                const snakeSegment = document.createElement("div");
+                snakeSegment.style.gridRowStart = segment.y;
+                snakeSegment.style.gridColumnStart = segment.x;
+                snakeSegment.style.backgroundColor = 'grey';
+                snakeSegment.classList.add("snake");
+                gameBoard.appendChild(snakeSegment);
+            });
+            snake4.body.forEach((segment) => {
+                const snakeSegment = document.createElement("div");
+                snakeSegment.style.gridRowStart = segment.y;
+                snakeSegment.style.gridColumnStart = segment.x;
+                snakeSegment.style.backgroundColor = 'orange';
+                snakeSegment.classList.add("snake");
+                gameBoard.appendChild(snakeSegment);
+            });
+        }
+
+        // Function to eliminate the snake
+        function eliminateSnake(snake){
+            snake.body = [];
+            snake.alive = false;
+            snake.finishPosition = snake1.alive + snake2.alive + snake3.alive + snake4.alive + 1;
+        }
+
+        // Function to loose HP
+        function looseHP(snake){
+            snake.body.shift();
+            updateScore();
+
+            if (snake.body.length < MIN_HP){
+                // gameOver(" Snake died");
+                eliminateSnake(snake);
+            }
+        }
+
+        // check game end condition (only 1 snake left)
+        function checkEnd(){
+            if ((!snake1.alive) && (!snake2.alive) && (!snake3.alive) && (!snake4.alive)){
+                gameOver();
+            }
+        }
+
+        // Function to update the snake's position
+        function updateSnake(snake) {
+            // Move the snake based on its direction
+            const head = { x: snake.body[0].x, y: snake.body[0].y };
+
+            if (snake.direction === "up") head.y--;
+            if (snake.direction === "down") head.y++;
+            if (snake.direction === "left") head.x--;
+            if (snake.direction === "right") head.x++;
+
+            // Add the new head to the snake's body
+            snake.body.unshift(head);
+
+            // Remove the tail segment
+            snake.body.pop();
+
+            // check self colision
+            // for (let i = 1; i < snake.body.length; i++) {
+            //     if (head.x === snake.body[i].x && head.y === snake.body[i].y){
+            //         // gameOver(" Snake colided with itself");
+            //         looseHP(snake);
+            //     }
+            // }
+
+            // check colisions
+            // checkColision(snake);
+            
+        }
+
+        // Function to check if eaten food
+        function checkFood(snake){
+            const head = { x: snake.body[0].x, y: snake.body[0].y };
+
+            // check if the snake has eaten the food
+            for (let i = 0; i < food.length; i++) {
+                if (head.x === food[i].x && head.y === food[i].y) {
+                    snake.body.push(food[i]);
+                    food.splice(i, 1);
+                    food.push(generateFood());
+                    updateScore();
+
+                    // check if the snake has reached max length
+                    if (snake.body.length > snake.maxLength) {
+                        snake.maxLength = snake.body.length;
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        function checkColision(){
+
+            var head1 = [];
+            var head2 = [];
+            var head3 = [];
+            var head4 = [];
+
+            var trueBody1 = [];
+            var trueBody2 = [];
+            var trueBody3 = [];
+            var trueBody4 = [];
+
+            var colision1 = false;
+            var colision2 = false;
+            var colision3 = false;
+            var colision4 = false;
+
+            // define head and body and check if the snake has collided with the wall
+            if (snake1.alive){
+                head1 = {x: snake1.body[0].x, y: snake1.body[0].y};
+                trueBody1 = [...snake1.body];
+                trueBody1.splice(0, 1);
+                if (head1.x < boardWidthMin || head1.x > boardHeightMax || head1.y < boardHeightMin || head1.y > boardHeightMax) {
+                    // looseHP(snake1);  
+                    colision1 = true; 
+                }
+                
+            }
+            if (snake2.alive){
+                head2 = {x: snake2.body[0].x, y: snake2.body[0].y};
+                trueBody2 = [...snake2.body];
+                trueBody2.splice(0, 1);
+                if (head2.x < boardWidthMin || head2.x > boardHeightMax || head2.y < boardHeightMin || head2.y > boardHeightMax) {
+                    // looseHP(snake2);   
+                    colision2 = true;
+                }
+            }
+            if (snake3.alive){
+                head3 = {x: snake3.body[0].x, y: snake3.body[0].y};
+                trueBody3 = [...snake3.body];
+                trueBody3.splice(0, 1);
+                if (head3.x < boardWidthMin || head3.x > boardHeightMax || head3.y < boardHeightMin || head3.y > boardHeightMax) {
+                    // looseHP(snake3);   
+                    colision3 = true;
+                }
+            }
+            if (snake4.alive){
+                head4 = {x: snake4.body[0].x, y: snake4.body[0].y};
+                trueBody4 = [...snake4.body];
+                trueBody4.splice(0, 1);
+                if (head4.x < boardWidthMin || head4.x > boardHeightMax || head4.y < boardHeightMin || head4.y > boardHeightMax) {
+                    // looseHP(snake4); 
+                    colision4 = true;  
+                }
+            }
+
+            var allTrueBody = trueBody1.concat(trueBody2, trueBody3, trueBody4);
+
+            // check if the snake has collided with other snake body
+            for (let i = 0; i < allTrueBody.length; i++) {
+                if (snake1.alive && (head1.x === allTrueBody[i].x && head1.y === allTrueBody[i].y)){
+                    // looseHP(snake1);
+                    colision1 = true;
+                }
+                if (snake2.alive && (head2.x === allTrueBody[i].x && head2.y === allTrueBody[i].y)){
+                    colision2 = true;
+                }
+                if (snake3.alive && (head3.x === allTrueBody[i].x && head3.y === allTrueBody[i].y)){
+                    // looseHP(snake3);
+                    colision3 = true;
+                }
+                if (snake4.alive && (head4.x === allTrueBody[i].x && head4.y === allTrueBody[i].y)){
+                    // looseHP(snake4);
+                    colision4 = true;
+                }
+            }
+
+            // check head to head colision
+            if ((snake1.alive && snake2.alive) && (head1.x === head2.x && head1.y === head2.y)){
+                colision1 = true;
+                colision2 = true;
+            }
+            if ((snake1.alive && snake3.alive) && (head1.x === head3.x && head1.y === head3.y)){
+                colision1 = true;
+                colision3 = true;
+            }
+            if ((snake1.alive && snake4.alive) && (head1.x === head4.x && head1.y === head4.y)){
+                colision1 = true;
+                colision4 = true;
+            }
+            if ((snake2.alive && snake3.alive) && (head2.x === head3.x && head2.y === head3.y)){
+                colision2 = true;
+                colision3 = true;
+            }
+            if ((snake2.alive && snake4.alive) && (head2.x === head4.x && head2.y === head4.y)){
+                colision2 = true;
+                colision4 = true;
+            }
+            if ((snake3.alive && snake4.alive) && (head3.x === head4.x && head3.y === head4.y)){
+                colision3 = true;
+                colision4 = true;
+            }
+
+
+            if (colision1)
+                looseHP(snake1);
+            if (colision2)
+                looseHP(snake2);
+            if (colision3)
+                looseHP(snake3);
+            if (colision4)
+                looseHP(snake4);
+
+        }
+        
+        // Function to update boarder size
+        function updateBoarderSize(decrease = DECREASE_PER_ROUND){
+            boardWidthMin = boardWidthMin + decrease;
+            boardWidthMax = boardWidthMax - decrease;
+            boardHeightMin = boardHeightMin + decrease;
+            boardHeightMax = boardHeightMax - decrease;
+            
+            // Update the box-shadow to create a secondary border
+            gameBoard.style.boxShadow = `inset 0 0 0 ${(BOARD_SIZE - boardWidthMax)*PIXEL_SIZE}px red, 
+            inset 0 0 0 ${(BOARD_SIZE - (boardWidthMax - decrease))*PIXEL_SIZE}px pink`;
+            
+        }
+
+        // Function to draw the food on the game board
+        function drawFood(food) {
+            food.forEach((foodItem) => {
+                const foodElement = document.createElement("div");
+                foodElement.style.gridRowStart = foodItem.y;
+                foodElement.style.gridColumnStart = foodItem.x;
+                foodElement.style.backgroundColor = 'red';
+                foodElement.classList.add("food");
+                gameBoard.appendChild(foodElement);
+            });
+        }
+
+        // Function to update the score
+        function updateScore() {
+            const scoreElement1 = document.getElementById("hp1");
+            scoreElement1.textContent = snake1.body.length;
+
+            const scoreElement2 = document.getElementById("hp2");
+            scoreElement2.textContent = snake2.body.length;
+
+            const scoreElement3 = document.getElementById("hp3");
+            scoreElement3.textContent = snake3.body.length;
+
+            const scoreElement4 = document.getElementById("hp4");
+            scoreElement4.textContent = snake4.body.length;
+        }
+
+        // Function to generate random food
+        function generateFood() {
+            const food = [];
+
+            for (let i = 0; i < FOOD_PER_ROUND; i++) {
+                const newFood = {
+                    x: Math.floor(Math.random() * (boardWidthMax-boardWidthMin)) + 1 + boardWidthMin,
+                    y: Math.floor(Math.random() * (boardHeightMax-boardHeightMin)) + 1 + boardHeightMin,
+                };
+
+                // Check if the food is generated on the snake
+                var allBody = snake1.body.concat(snake2.body, snake3.body, snake4.body);
+
+                for (let j = 0; j < allBody.length; j++) {
+                    if (newFood.x === allBody[j].x && newFood.y === allBody[j].y) {
+                        return generateFood();
+                    }
+                }
+
+                food.push(newFood);
+            }
+
+            return food;
+        }
+
+        // Generate the first food
+        let food = generateFood();
+
+        // Update game timer
+        function updateTimer(){
+            const timerElement = document.getElementById("timer");
+            timerElement.textContent = Math.floor(gameTimer / FRAME_RATE);
+        }
+
+        // Update round count down
+        function updateCountDown(){
+            const countDownElement = document.getElementById("count-down");
+            countDownElement.textContent = Math.floor((FRAMES_PER_ROUND - gameTimer % FRAMES_PER_ROUND) / FRAME_RATE);
+        }
+
+
+        // Function to handle key presses
+        const clockwise = {
+            "up": "right",
+            "right": "down",
+            "down": "left",
+            "left": "up",
+        };
+
+        const antiClockwise = {
+            "up": "left",
+            "left": "down",
+            "down": "right",
+            "right": "up",
+        };
+
+        function handleKeyPressP1(event) {
+            // player 1 controls
+            if (event.key == "q" || event.key == "Q")
+                snake1.direction = antiClockwise[snake1.direction];
+            if (event.key == "w" || event.key == "W")
+                snake1.direction = clockwise[snake1.direction];
+
+            if (event.key === "R" || event.key === "r")
+                gameOver(" Reloaded");
+            
+        }
+
+        function handleKeyPressP2(event) {
+            // player 2 controls
+            if (event.key == "z" || event.key == "Z")
+                snake2.direction = antiClockwise[snake2.direction];
+            if (event.key == "x" || event.key == "X")
+                snake2.direction = clockwise[snake2.direction];
+        }
+
+        function handleKeyPressP3(event){
+            // player 3 controls
+            if (event.key == "o" || event.key == "O")
+                snake3.direction = antiClockwise[snake3.direction];
+            if (event.key == "p" || event.key == "P")
+                snake3.direction = clockwise[snake3.direction];
+        }
+
+        function handleKeyPressP4(event){
+            // player 4 controls
+            if (event.key === "," || event.key === "<")
+                snake4.direction = antiClockwise[snake4.direction];
+            if (event.key === "." || event.key === ">")
+                snake4.direction = clockwise[snake4.direction];
+        }
+
+        // Set up event listener for key presses
+        // with a delay to allow only one input per frame
+        
+        let canAcceptKeyDownP1 = true;
+        document.addEventListener('keydown', (event) => {
+            // Only allow one keydown event per frame
+            if (!canAcceptKeyDownP1) {
+                return;
+            }
+            handleKeyPressP1(event);
+            // if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "R", "r"].includes(event.key)){
+            if (["Q", "q", "W", "w", "R", "r"].includes(event.key)){
+                canAcceptKeyDownP1 = false;
+            }
+            });
+
+        let canAcceptKeyDownP2 = true;
+        document.addEventListener('keydown', (event) => {
+            // Only allow one keydown event per frame
+            if (!canAcceptKeyDownP2) {
+                return;
+            }
+            handleKeyPressP2(event);
+            if (["Z", "z", "X", "x"].includes(event.key)){
+                canAcceptKeyDownP2 = false;
+            }
+            });
+
+        let canAcceptKeyDownP3 = true;
+        document.addEventListener('keydown', (event) => {
+            // Only allow one keydown event per frame
+            if (!canAcceptKeyDownP3) {
+                return;
+            }
+            handleKeyPressP3(event);
+            if (["O", "o", "P", "p"].includes(event.key)){
+                canAcceptKeyDownP3 = false;
+            }
+            });
+
+        let canAcceptKeyDownP4 = true;
+        document.addEventListener('keydown', (event) => {
+            // Only allow one keydown event per frame
+            if (!canAcceptKeyDownP4) {
+                return;
+            }
+            handleKeyPressP4(event);
+            if (["<", ",", ">", "."].includes(event.key)){
+                canAcceptKeyDownP4 = false;
+            }
+            });
+
+        // Function to allow keydown
+        function allowKeyDown(){
+            canAcceptKeyDownP1 = true;
+            canAcceptKeyDownP2 = true;
+            canAcceptKeyDownP3 = true;
+            canAcceptKeyDownP4 = true;
+        }
+
+        // Function to start the game
+        function startGame() {
+            setInterval(() => {
+                if (snake1.alive)
+                    updateSnake(snake1);
+                if (snake2.alive)
+                    updateSnake(snake2);
+                if (snake3.alive)
+                    updateSnake(snake3);
+                if (snake4.alive)
+                    updateSnake(snake4);
+
+                checkColision();
+
+                if (snake1.alive)
+                    checkFood(snake1);
+                if (snake2.alive)
+                    checkFood(snake2);
+                if (snake3.alive)
+                    checkFood(snake3);
+                if (snake4.alive)
+                    checkFood(snake4);
+
+                drawSnake();
+                drawFood(food);
+                gameTimer++;
+                allowKeyDown(); // allow keydown event after drawing
+                updateTimer();
+                updateCountDown();
+                if (gameTimer % (FRAMES_PER_ROUND ) === 1) {
+                    updateBoarderSize(DECREASE_PER_ROUND);
+                    food = generateFood();
+                }
+                checkEnd();
+            }, 1000/FRAME_RATE); // Update every 1 second/FRAME_RATE
+        }
+
+        // Start the game
+        startGame();
+        
+
+    </script>
+</body>
+</html>
