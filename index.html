@@ -37,10 +37,64 @@
             color: orange;
         }
 
+        /* #end-card {
+            text-align: center;
+            font-size: 40px;
+            margin-top: 20px;
+        } */
+
+        .form-popup {
+            display: "block";
+            position: fixed;
+            top: 25%;
+            left: 50%;
+            border: 3px solid #f1f1f1;
+            z-index: 9;
+            font-size:24px;
+        }
+        .form-container {
+            max-width: 300px;
+            padding: 10px;
+            background-color: white;
+        }
+        .form-container .btn {
+            background-color: #04AA6D;
+            color: white;
+            padding: 16px 20px;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom:10px;
+            opacity: 0.8;
+            font-size:24px;
+        }
+        .form-container .btn:hover, .close-button:hover {
+            opacity: 1;
+            font-size:24px;
+        }
     </style>
             
 </head>
 <body>
+    <!-- <div class="popup" onclick="setGameOptions()">Click me!<span class="popuptext" id="myPopup">popup text</span></div> -->
+    <div class="form-popup" id="settingsForm">
+        <form class="form-container" action="javascript:void(0);">
+            <label for="players">Players </label>
+            <input type="number" value=3 name="players" id="players" min=1 max=4 required> 
+            <br>
+            <label for="speed">Game Speed </label>
+            <select name="speed" id="speed" required>
+                <option value="slow">Slow</option>
+                <option value="normal" selected="selected" >Normal</option>
+                <option value="fast">Fast</option>
+            </select>
+            <br>
+            <button class="close-button" id="closeForm" onclick="setGameOptions(this.form)">PLAY</button>
+        </form>
+    </div>  
+
+    <div id="end-card"></div>
+
     <div id="score-card">Snake 1 HP: <span id="hp1">4</span> | Snake 2 HP: <span id="hp2">4</span> | Snake 3 HP: <span id="hp3">4</span> | Snake 4 HP: <span id="hp4">4</span></div>
     <div id="score-card">Round count down: <span id="count-down">999</span></div>
     <div class="center" id="game-board"></div>
@@ -49,18 +103,33 @@
 
     <script>
         /** To do:
-         * 4 player, only 2 key contols, turn clockwise or anti-clockwise
-         * Game ends only when final snake dies
          * Joint positions are allowed
+         * Select speed and number of players
          **/
 
-        const FRAME_RATE = 5;
+
         const BOARD_SIZE = 80; // grid repeat times
         const PIXEL_SIZE = 11; // 10px + 1px border, repeat px + gap px
         const MIN_HP = 3;
-        const FRAMES_PER_ROUND = 120;
+        // const frames_per_round = 120;
+
         const FOOD_PER_ROUND = 11;
         const DECREASE_PER_ROUND = Math.floor(BOARD_SIZE/20);
+
+        let number_of_players = 3;
+        // let number_of_players = document.getElementById("settingsForm");
+
+        let speed_setting = "fast"
+        // let speed_setting = document.getElementById();
+
+        var speed_lookup = {
+            "slow" : 5,
+            "normal" : 10,
+            "fast" : 20
+        };
+
+        let frame_rate = speed_lookup[speed_setting];
+        let frames_per_round = 20 * frame_rate; // 20 seconds per game
 
         // Get the game board element
         const gameBoard = document.getElementById("game-board");
@@ -78,7 +147,7 @@
         const instructions = document.getElementById("instructions");
         instructions.textContent = `Player 1: QW to move. Player 2: ZX to move. Player 3: OP to move. Player 4: ,. to move. 
         Can turn clockwise or anti-clockwise.
-        Press R to reload. Beware of the shrinking boarder every ${FRAMES_PER_ROUND / FRAME_RATE} seconds!
+        Press R to reload. Beware of the shrinking boarder every ${frames_per_round / frame_rate} seconds!
         If you drop below ${MIN_HP} HP, you die!`;
 
         // Create the snakes
@@ -95,6 +164,7 @@
             alive: true,
             player: 1,
             finishPosition: 0,
+            timeAlive: 0,
         };
 
         var snake2 = {
@@ -109,6 +179,7 @@
             alive: true,
             player: 2,
             finishPosition: 0,
+            timeAlive: 0,
         };
 
         var snake3 = {
@@ -123,6 +194,7 @@
             alive: true,
             player: 3,
             finishPosition: 0,
+            timeAlive: 0,
         };
 
         var snake4 = {
@@ -137,23 +209,60 @@
             alive: true,
             player: 4,
             finishPosition: 0,
+            timeAlive: 0,
         };
 
+        // Function to set game options after closing form
+        function setGameOptions(form){
+            document.getElementById("settingsForm").style.display = "none";
+
+            // set number of players
+            number_of_players = Number(form.players.value)
+
+            if (number_of_players <= 3){
+                eliminateSnake(snake4)
+            }
+            if (number_of_players <= 2) {
+                eliminateSnake(snake2)
+            }
+            if (number_of_players <= 1) {
+                eliminateSnake(snake3)
+            }
+
+            // set speed
+            speed_setting = form.speed.value
+
+            frame_rate = speed_lookup[speed_setting];
+            frames_per_round = 20 * frame_rate; // 20 seconds per game
+
+
+            // Start the game
+            startGame();
+        };
 
         // Function to game over
         function gameOver(otherText = ""){
 
             // use snake finish position to determine winner
-            alert("Game Over!\n  Snake 1 finish position: " + snake1.finishPosition + " with max length: " + snake1.maxLength +
-            "\n  Snake 2 finish position: " + snake2.finishPosition + " with max length: " + snake2.maxLength +
-            "\n  Snake 3 finish position: " + snake3.finishPosition + " with max length: " + snake3.maxLength +
-            "\n  Snake 4 finish position: " + snake4.finishPosition + " with max length: " + snake4.maxLength + "\n" + otherText);
+            results = "Game Over!\n";
+            var snakes = [snake1, snake2, snake3, snake4];
+            snakes.sort((a, b) => a.finishPosition - b.finishPosition);
+            snakes.forEach((snake, index) => {
+                results += `  Snake ${index + 1} finish position: ${snake.finishPosition} with max length: ${snake.maxLength}. Time alive: ${snake.timeAlive} seconds\n`;
+            });
+            results += otherText;
+
+            alert(results);
 
             // alert("Game Over!" + otherText);
 
             // reload the page if press OK
             window.location.reload(true);
-            window.location.href = window.location.href;            
+            window.location.href = window.location.href;  
+            
+            
+            // document.getElementById("settingsForm").style.display = "block";
+            // document.getElementById("end-card").textContent = results;
         }
 
         // Function to draw the snake on the game board
@@ -198,6 +307,7 @@
         function eliminateSnake(snake){
             snake.body = [];
             snake.alive = false;
+            snake.timeAlive = Math.floor(gameTimer / frame_rate);
             snake.finishPosition = snake1.alive + snake2.alive + snake3.alive + snake4.alive + 1;
         }
 
@@ -234,17 +344,6 @@
 
             // Remove the tail segment
             snake.body.pop();
-
-            // check self colision
-            // for (let i = 1; i < snake.body.length; i++) {
-            //     if (head.x === snake.body[i].x && head.y === snake.body[i].y){
-            //         // gameOver(" Snake colided with itself");
-            //         looseHP(snake);
-            //     }
-            // }
-
-            // check colisions
-            // checkColision(snake);
             
         }
 
@@ -456,13 +555,13 @@
         // Update game timer
         function updateTimer(){
             const timerElement = document.getElementById("timer");
-            timerElement.textContent = Math.floor(gameTimer / FRAME_RATE);
+            timerElement.textContent = Math.floor(gameTimer / frame_rate);
         }
 
         // Update round count down
         function updateCountDown(){
             const countDownElement = document.getElementById("count-down");
-            countDownElement.textContent = Math.floor((FRAMES_PER_ROUND - gameTimer % FRAMES_PER_ROUND) / FRAME_RATE);
+            countDownElement.textContent = Math.floor((frames_per_round - gameTimer % frames_per_round) / frame_rate);
         }
 
 
@@ -579,6 +678,8 @@
 
         // Function to start the game
         function startGame() {
+            console.log("Game started");
+            // getGameOptions();
             setInterval(() => {
                 if (snake1.alive)
                     updateSnake(snake1);
@@ -606,16 +707,16 @@
                 allowKeyDown(); // allow keydown event after drawing
                 updateTimer();
                 updateCountDown();
-                if (gameTimer % (FRAMES_PER_ROUND ) === 1) {
+                if (gameTimer % (frames_per_round ) === 1) {
                     updateBoarderSize(DECREASE_PER_ROUND);
                     food = generateFood();
                 }
                 checkEnd();
-            }, 1000/FRAME_RATE); // Update every 1 second/FRAME_RATE
+            }, 1000/frame_rate); // Update every 1 second/frame_rate
         }
 
         // Start the game
-        startGame();
+        // startGame();
         
 
     </script>
