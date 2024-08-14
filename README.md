@@ -19,7 +19,6 @@ Snakes can turn clockwise or anti-clockwise.
 
 
 ## In development
-- Interface to select snake speed and players
 - Multiplayer on multiple devices
 - Mobile support
 - Powerups
