@@ -37,6 +37,22 @@
             color: orange;
         }
 
+        #snake1 {
+            color: blue;
+        }
+        
+        #snake2 {
+            color: green;
+        }
+
+        #snake3 {
+            color: grey;
+        }
+
+        #snake4 {
+            color: orange;
+        }
+
         #end-card {
             text-align: center;
             font-size: 24px;
@@ -102,7 +118,7 @@
         </form>
     </div>
 
-    <div id="score-card">Snake 1 HP: <span id="hp1">4</span> | Snake 2 HP: <span id="hp2">4</span> | Snake 3 HP: <span id="hp3">4</span> | Snake 4 HP: <span id="hp4">4</span></div>
+    <div id="score-card"><span id="snake1">Snake 1 HP: </span><span id="hp1">4</span> | <span id="snake2">Snake 2 HP: </span><span id="hp2">4</span> | <span id="snake3">Snake 3 HP: </span><span id="hp3">4</span> | <span id="snake4">Snake 4 HP: </span><span id="hp4">4</span></div>
     <div id="score-card">Round count down: <span id="count-down">999</span></div>
     <div class="center" id="game-board"></div>
     <div id="score-card">Game Timer: <span id="timer">0</span></div>
@@ -143,13 +159,21 @@
         // Create game instructions
         const instructions = document.getElementById("instructions");
         instructions.innerHTML = `<h2>How to play:</h2> <br> 
-        Player 1: <tt>Q W</tt> to move. <br>
-        Player 2: <tt>Z X</tt> to move. <br>
-        Player 3: <tt>O P</tt> to move. <br>
-        Player 4: <tt>, .</tt> to move. <br>
+        <div id="snake1">Player 1: <tt>Q W</tt> to move. </div>
+        <div id="snake2">Player 2: <tt>O P</tt> to move. </div>
+        <div id="snake3">Player 3: <tt>, .</tt> to move. </div>
+        <div id="snake4">Player 4: <tt>Z X</tt> to move. </div>
         Can turn clockwise or anti-clockwise. <br><br>
-        Press <tt>R</tt> to reload. Beware of the shrinking boarder every ${frames_per_round / frame_rate} seconds! <br>
+        Beware of the shrinking boarder every ${frames_per_round / frame_rate} seconds! <br>
         If you drop below ${MIN_HP} HP, you die!`;
+        // instructions.innerHTML = `<h2>How to play:</h2> <br> 
+        // Player 1: <tt>Q W</tt> to move. <br>
+        // Player 2: <tt>O P</tt> to move. <br>
+        // Player 3: <tt>, .</tt> to move. <br>
+        // Player 4: <tt>Z X</tt> to move. <br>
+        // Can turn clockwise or anti-clockwise. <br><br>
+        // Press <tt>R</tt> to reload. Beware of the shrinking boarder every ${frames_per_round / frame_rate} seconds! <br>
+        // If you drop below ${MIN_HP} HP, you die!`;
 
 
         // Game timer
@@ -271,16 +295,32 @@
         function gameOver(otherText = ""){
             // stop game
             clearInterval(gameInterval);
-            
+
             // use snake finish position to determine winner
-            results = "<h2>Game Over!</h2><br>";
+            // results = "<h2>Game Over!</h2>"
+            results = ""
             var snakes = [snake1, snake2, snake3, snake4];
             // snakes.sort((a, b) => a.finishPosition - b.finishPosition);
+
             snakes.forEach((snake, index) => {
-                results += `<h4>Snake ${index + 1}</h4>
-                Finish position: ${snake.finishPosition}
-                Max length: ${snake.maxLength}
-                Time alive: ${snake.timeAlive} seconds`;
+                // Eliminate final snake to calculate score
+                if (snake.alive){
+                    eliminateSnake(snake);
+                    snake.timeAlive += 1 // make winner more obvious
+                }
+
+                if (snake.finishPosition <= 1){
+                    results += `<h2>Winner: <span id="snake${index + 1}">Snake ${index + 1}</span></h2>`
+                }
+            });
+
+            snakes.forEach((snake, index) => {
+                if (snake.timeAlive > 0){
+                    results += `<h4><span id="snake${index + 1}">Snake ${index + 1}</span></h4>
+                    Finish position: ${snake.finishPosition}
+                    Max length: ${snake.maxLength}
+                    Time alive: ${snake.timeAlive} seconds`
+                };
             });
             results += otherText;
 
@@ -347,9 +387,18 @@
             }
         }
 
+        // // check game end condition (only 0 snake left)
+        // function checkEnd(){
+        //     if ((!snake1.alive) && (!snake2.alive) && (!snake3.alive) && (!snake4.alive)){
+        //         gameOver();
+        //     }
+        // }
         // check game end condition (only 1 snake left)
         function checkEnd(){
-            if ((!snake1.alive) && (!snake2.alive) && (!snake3.alive) && (!snake4.alive)){
+            if ((number_of_players > 1) && ((snake1.alive + snake2.alive + snake3.alive + snake4.alive) < 2)){
+                gameOver();
+            } 
+            else if ((number_of_players <= 1) && ((!snake1.alive) && (!snake2.alive) && (!snake3.alive) && (!snake4.alive))){
                 gameOver();
             }
         }
@@ -612,32 +661,32 @@
             if (event.key == "w" || event.key == "W")
                 snake1.direction = clockwise[snake1.direction];
 
-            if (event.key === "R" || event.key === "r")
-                gameOver(" Reloaded");
+            // if (event.key === "R" || event.key === "r")
+            //     gameOver(" Reloaded");
             
         }
 
         function handleKeyPressP2(event) {
             // player 2 controls
-            if (event.key == "z" || event.key == "Z")
+            if (event.key == "o" || event.key == "O")
                 snake2.direction = antiClockwise[snake2.direction];
-            if (event.key == "x" || event.key == "X")
+            if (event.key == "p" || event.key == "P")
                 snake2.direction = clockwise[snake2.direction];
         }
 
         function handleKeyPressP3(event){
             // player 3 controls
-            if (event.key == "o" || event.key == "O")
+            if (event.key === "," || event.key === "<")
                 snake3.direction = antiClockwise[snake3.direction];
-            if (event.key == "p" || event.key == "P")
+            if (event.key === "." || event.key === ">")
                 snake3.direction = clockwise[snake3.direction];
         }
 
         function handleKeyPressP4(event){
             // player 4 controls
-            if (event.key === "," || event.key === "<")
+            if (event.key == "z" || event.key == "Z")
                 snake4.direction = antiClockwise[snake4.direction];
-            if (event.key === "." || event.key === ">")
+            if (event.key == "x" || event.key == "X")
                 snake4.direction = clockwise[snake4.direction];
         }
 
@@ -664,7 +713,7 @@
                 return;
             }
             handleKeyPressP2(event);
-            if (["Z", "z", "X", "x"].includes(event.key)){
+            if (["O", "o", "P", "p"].includes(event.key)){
                 canAcceptKeyDownP2 = false;
             }
             });
@@ -676,7 +725,7 @@
                 return;
             }
             handleKeyPressP3(event);
-            if (["O", "o", "P", "p"].includes(event.key)){
+            if (["<", ",", ">", "."].includes(event.key)){
                 canAcceptKeyDownP3 = false;
             }
             });
@@ -688,7 +737,7 @@
                 return;
             }
             handleKeyPressP4(event);
-            if (["<", ",", ">", "."].includes(event.key)){
+            if (["Z", "z", "X", "x"].includes(event.key)){
                 canAcceptKeyDownP4 = false;
             }
             });
